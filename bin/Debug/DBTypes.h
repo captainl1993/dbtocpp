@@ -1,5 +1,5 @@
 #pragma once
-namespace DBproduce
+namespace DBProduce
 {
 	struct player
 	{
@@ -11,7 +11,7 @@ namespace DBproduce
 	struct player_item
 	{
 		int id;
-		int user id;
+		int userid;
 		int itemid;
 	};
 }
