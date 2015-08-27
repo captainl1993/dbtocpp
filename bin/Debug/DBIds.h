@@ -1,8 +1,9 @@
 #pragma once
-namespace DBProduce
+namespace DBproduce
 {
 	class DBIds
     {
-        static int player;        static int player_item;
-    };
+        static int player=0;
+        static int player_item=0;
+    }
 }

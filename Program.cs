@@ -17,8 +17,6 @@ namespace dbtocpp
             //生成数据库数据结构
             Gencpp.GenStructs();
             Gencpp.GenIds();
-            Gencpp.GenDBHandler();
-            Gencpp.GenDBReader();
         }
     }
 }
