@@ -156,8 +156,13 @@ namespace DBProduce
 		}
 	}
 	void DBReader::DBtoHandler()
-	{
-		
+	{");
+            foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
+            {
+                sb.Append(@"
+        " + table.Key + @"toHandler();");
+            }
+            sb.Append(@"
 	}
 	void DBReader::SetDBHandler(DBHandler* _Handler)
 	{
