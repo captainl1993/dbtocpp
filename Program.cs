@@ -19,6 +19,7 @@ namespace dbtocpp
             Gencpp.GenIds();
             Gencpp.GenDBHandler();
             Gencpp.GenDBReader();
+            Gencpp.GenRedisHandler();
         }
     }
 }

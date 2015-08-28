@@ -61,7 +61,9 @@ namespace DBProduce
 {
 	class DBHandler
 	{
-		public:");
+		public:
+			DBHandler();
+			virtual ~DBHandler();");
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
             {
                 sb.Append(@"
@@ -78,7 +80,15 @@ namespace DBProduce
             sb.Append(@"#include ""All.h""
 
 namespace DBProduce
-{");
+{
+	DBHandler::DBHandler()
+	{
+
+	}
+	DBHandler::~DBHandler()
+	{
+
+	}");
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
             {
                 sb.Append(@"
@@ -110,6 +120,7 @@ namespace DBProduce
 		public:
 			static void connection(const char* host, const char* user,
 			        const char* password, const char* database);
+			static void Disconnect();
 			static void DBtoHandler();
 			static void SetDBHandler(DBHandler* _Handler);");
 
@@ -132,7 +143,7 @@ namespace DBProduce
 {
 	MYSQL DBReader::conn;
 	MYSQL_RES* DBReader::res_ptr = nullptr;
-	MYSQL_ROW DBReader::sqlrow = nullptr;
+	MYSQL_ROW DBReader::sqlrow;
 	DBHandler* DBReader::dbHandler = nullptr;
 	void DBReader::connection(const char* host, const char* user,
 	        const char* password, const char* database)
@@ -142,6 +153,7 @@ namespace DBProduce
 		if (mysql_real_connect(&conn, host, user, password, database, 0, NULL,
 		        0))
 		{
+            mysql_query(&conn, ""SET NAMES UTF8"");
 			printf(""Connection success!\n"");
 		}
 		else
@@ -154,6 +166,10 @@ namespace DBProduce
 			}
 			exit (EXIT_FAILURE);
 		}
+	}
+	void DBReader::Disconnect()
+	{
+        mysql_close (&conn);
 	}
 	void DBReader::DBtoHandler()
 	{");
@@ -188,7 +204,7 @@ namespace DBProduce
 					mysql_field_count (&conn);
 					" + table.Key + @" * p = new " + table.Key + @"();");
 
-                for (int i=0;i< table.Value.Count;i++)
+                for (int i = 0; i < table.Value.Count; i++)
                 {
                     sb.Append(@"
 					p->" + table.Value[i].name + "= ");
@@ -207,7 +223,7 @@ namespace DBProduce
                         sb.Append("sqlrow[" + i + "];");
                     }
                 }
-                    sb.Append(@"
+                sb.Append(@"
 					dbHandler->read" + table.Key + @"(p);
 				}
 				if (mysql_errno (&conn))
@@ -224,5 +240,89 @@ namespace DBProduce
 ");
             OutPut.Out("DBReader.cpp", sb.ToString());
         }
+
+        public static void GenRedisHandler()
+        {
+            sb.Clear();
+            sb.Append(@"#pragma once
+namespace DBProduce
+{
+	class RedisHandler: public DBHandler
+	{
+		private:
+			RedisDBEngine redisengine;
+		public:
+			RedisHandler();
+			virtual ~RedisHandler();
+
+			void connect(std::string _ip, short _port);
+			//清空redis中所有的数据，慎用
+			void flashAll();");
+            foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
+            {
+                sb.Append(@"
+			void read" + table.Key + @"(DBProduce::" + table.Key + @"* _" + table.Key + @");");
+            }
+            sb.Append(@"
+	};
+
+}
+");
+            OutPut.Out("RedisHandler.h", sb.ToString());
+            //CPP文件---------------------------------------------------------------------------
+            sb.Clear();
+            sb.Append(@"#include ""All.h""
+
+namespace DBProduce
+{
+	RedisHandler::RedisHandler()
+	{
+	}
+	RedisHandler::~RedisHandler()
+	{
+		
+	}
+	void RedisHandler::connect(std::string _ip, short _port)
+	{
+		redisengine.connect(_ip, _port);
+	}
+	void RedisHandler::flashAll()
+	{
+		std::string cmd = ""flushall"";
+		redisengine.excuteCommoned(cmd);
+	}");
+
+            foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
+            {
+                sb.Append(@"
+	void RedisHandler::read" + table.Key + @"(DBProduce::" + table.Key + @"* _" + table.Key + @")
+	{");
+                sb.Append(@"
+        std::string cmd = ""hmset  " + table.Key + @":"" + std::to_string(_" + table.Key + @"->id) ");
+                for (int i = 1; i < table.Value.Count; i++)
+                {
+                    if (TypesChange.dbtocpp(table.Value[i].type) == "std::string")
+                    {
+                        sb.Append(@"
+        + "" " + table.Value[i].name + @" "" + _" + table.Key + @"->" + table.Value[i].name + @" ");
+                    }
+                    else
+                    {
+                        sb.Append(@"
+        + "" " + table.Value[i].name + @" "" + std::to_string(_" + table.Key + @"->" + table.Value[i].name + @") ");                    
+                    }
+                }
+                sb.Append(@";
+		redisengine.excuteCommoned(cmd);
+		delete _" + table.Key + @";
+	}");
+            }
+
+            sb.Append(@"
+}
+");
+            OutPut.Out("RedisHandler.cpp", sb.ToString());
+        }
+
     }
 }
