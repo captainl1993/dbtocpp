@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Common\GenCommon.cs" />
     <Compile Include="Common\OutPut.cs" />
     <Compile Include="Common\TypesChange.cs" />
     <Compile Include="DownDatas.cs" />

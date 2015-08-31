@@ -9,10 +9,12 @@ namespace dbtocpp.Tools
 {
     public static class Gencpp
     {
+        static String vesion="V0.1";
         static StringBuilder sb = new StringBuilder();
         public static void GenStructs()
         {
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBTypes.h", vesion, "生成所有的数据表结构类，一张表对应一个类。");
             sb.Append(@"#pragma once
 namespace DBProduce
 {
@@ -36,6 +38,8 @@ namespace DBProduce
         public static void GenIds()
         {
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBIds.h", vesion, "用于管理对应数据表的最大id，每次插入id+1。");
+
             sb.Append(@"#pragma once
 namespace DBProduce
 {
@@ -55,6 +59,8 @@ namespace DBProduce
         public static void GenDBHandler()
         {
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBHandler.h", vesion, "数据库处理接口，任何调用车可以继承这个接口实现数据库的处理方法实现。");
+
             sb.Append(@"#pragma once
 
 namespace DBProduce
@@ -77,6 +83,7 @@ namespace DBProduce
             OutPut.Out("DBHandler.h", sb.ToString());
             //cpp文件------------------------------------------------------------
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBHandler.cpp", vesion, "数据库处理接口，任何调用车可以继承这个接口实现数据库的处理方法实现。");
             sb.Append(@"#include ""All.h""
 
 namespace DBProduce
@@ -106,6 +113,8 @@ namespace DBProduce
         public static void GenDBReader()
         {
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBReader.h", vesion, "数据库统一读取实现，读取数据库所有的数据，并调用设置的处理接口进行处理。");
+
             sb.Append(@"#pragma once
 
 namespace DBProduce
@@ -137,6 +146,8 @@ namespace DBProduce
             OutPut.Out("DBReader.h", sb.ToString());
             //cpp-------------------------------------------------------------------
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBReader.cpp", vesion, "数据库统一读取实现，读取数据库所有的数据，并调用设置的处理接口进行处理。");
+
             sb.Append(@"#include ""All.h""
 
 namespace DBProduce
@@ -244,6 +255,7 @@ namespace DBProduce
         public static void GenRedisHandler()
         {
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "RedisHandler.h", vesion, "继承自DBHandler，以redis数据入库的方式来处理数据读出的数据。");
             sb.Append(@"#pragma once
 namespace DBProduce
 {
@@ -271,6 +283,8 @@ namespace DBProduce
             OutPut.Out("RedisHandler.h", sb.ToString());
             //CPP文件---------------------------------------------------------------------------
             sb.Clear();
+            sb = GenCommon.GenHeader(sb, "RedisHandler.cpp", vesion, "继承自DBHandler，以redis数据入库的方式来处理数据读出的数据。");
+
             sb.Append(@"#include ""All.h""
 
 namespace DBProduce
