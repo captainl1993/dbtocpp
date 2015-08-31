@@ -45,16 +45,34 @@ namespace DBProduce
 {
 	class DBIds
     {
-");
+    public:");
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
             {
 
-                sb.Append(@"        static int " + table.Key + @";");
+                sb.Append(@"
+        static int " + table.Key + @";");
             }
             sb.Append(@"
     };
 }");
             OutPut.Out("DBIds.h", sb.ToString());
+            //cpp文件------------------------------------------------------------------------------
+
+            sb.Clear();
+            sb = GenCommon.GenHeader(sb, "DBIds.cpp", vesion, "用于管理对应数据表的最大id，每次插入id+1。");
+
+            sb.Append(@"#include ""All.h""
+namespace DBProduce
+{
+");
+            foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
+            {
+                sb.Append(@"
+    int DBIds::" + table.Key + @"=0;");
+            }
+            sb.Append(@"
+}");
+            OutPut.Out("DBIds.cpp", sb.ToString());
         }
         public static void GenDBHandler()
         {
@@ -235,6 +253,11 @@ namespace DBProduce
                     }
                 }
                 sb.Append(@"
+
+                if(p->id>DBIds::" + table.Key + @")
+                {
+                    DBIds::" + table.Key + @"=p->id;
+                }
 					dbHandler->read" + table.Key + @"(p);
 				}
 				if (mysql_errno (&conn))
