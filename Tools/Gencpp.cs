@@ -12,7 +12,7 @@ namespace dbtocpp.Tools
         public static string folder = "";
         static String vesion = "V0.1";
         static StringBuilder sb = new StringBuilder();
-      
+
         //架构性代码和协议生成
         public static void GenStructs()
         {
@@ -38,7 +38,7 @@ namespace DBProduce
             sb.Append(@"}");
             OutPut.Out(folder + "DBTypes.h", sb.ToString());
         }
-     
+
         public static void GenIds()
         {
             sb.Clear();
@@ -78,7 +78,7 @@ namespace DBProduce
 }");
             OutPut.Out(folder + "DBIds.cpp", sb.ToString());
         }
-       
+
         public static void GenDBHandler()
         {
             sb.Clear();
@@ -133,7 +133,7 @@ namespace DBProduce
 ");
             OutPut.Out(folder + "DBHandler.cpp", sb.ToString());
         }
-     
+
         public static void GenDBReader()
         {
             sb.Clear();
@@ -243,7 +243,8 @@ namespace DBProduce
                 {
                     sb.Append(@"
 					p->" + table.Value[i].name + "= ");
-                    if (table.Value[i].type == "float" || table.Value[i].type == "double")
+                    if (table.Value[i].type == "float" || table.Value[i].type == "double"
+                        || table.Value[i].type == "decimal")
                     {
                         sb.Append("atof(sqlrow[" + i + "]);");
                     }
@@ -267,9 +268,9 @@ namespace DBProduce
                 }
                 sb.Append(@"
 
-                    if(p->id>DBIds::" + table.Key + @")
+                    if(p->" + table.Value[0].name + @">DBIds::" + table.Key + @")
                     {
-                        DBIds::" + table.Key + @"=p->id;
+                        DBIds::" + table.Key + @"=p->" + table.Value[0].name + @";
                     }
 					for (auto handler : dbHandlers)
 					{
@@ -350,18 +351,35 @@ namespace DBProduce
 	void RedisHandler::read" + table.Key + @"(std::shared_ptr <DBProduce::" + table.Key + @"> _" + table.Key + @")
 	{");
                 sb.Append(@"
-        std::string cmd = ""hmset  " + table.Key + @":"" + std::to_string(_" + table.Key + @"->id) ");
+        std::string cmd = ""hmset  " + table.Key + @":"" + std::to_string((long long)_" + table.Key + @"->" + table.Value[0].name + @"); ");
                 for (int i = 1; i < table.Value.Count; i++)
                 {
-                    if (TypesChange.dbtocpp(table.Value[i].type) == "std::string")
+                    if (table.Value[i].type == "blob"|| table.Value[i].type == "datetime")
                     {
                         sb.Append(@"
-        + "" " + table.Value[i].name + @" "" + _" + table.Key + @"->" + table.Value[i].name + @" ");
+		if (_" + table.Key + @"->" + table.Value[i].name + @".empty())
+		{
+			cmd.append( "" " + table.Value[i].name + @"  \"""" + NetUtility::replace(_" + table.Key + @"->" + table.Value[i].name + @","" "",""$$"")+""\"" "");
+		}
+		else
+		{
+			cmd.append("" " + table.Value[i].name + @" "" + NetUtility::replace(_" + table.Key + @"->" + table.Value[i].name + @","" "",""$$""));
+		}
+        ");
                     }
+
                     else
                     {
-                        sb.Append(@"
-        + "" " + table.Value[i].name + @" "" + std::to_string(_" + table.Key + @"->" + table.Value[i].name + @") ");
+                        if (TypesChange.dbtocpp(table.Value[i].type) == "std::string")
+                        {
+                            sb.Append(@"
+			cmd.append("" " + table.Value[i].name + @" "" + NetUtility::replace(_" + table.Key + @"->" + table.Value[i].name + @","" "",""$$"")); ");
+                        }
+                        else
+                        {
+                            sb.Append(@"
+			cmd.append("" " + table.Value[i].name + @" "" + NetUtility::replace(std::to_string(_" + table.Key + @"->" + table.Value[i].name + @"),"" "",""$$"") ); ");
+                        }
                     }
                 }
                 sb.Append(@";
@@ -380,6 +398,7 @@ namespace DBProduce
             sb.Clear();
             sb = GenCommon.GenHeader(sb, "RedisReader.h", vesion, "RedisReader是用作功用查询redis数据库的读取器，调用其中方法读出相应的结构。");
             sb.Append(@"#pragma once
+#include ""DBTypes.h""
 namespace DBProduce
 {
 	class RedisReader
@@ -391,7 +410,7 @@ namespace DBProduce
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
             {
                 sb.Append(@"
-			static bool Get" + table.Key + @"(std::shared_ptr<" + table.Key + @"> p, int id);");
+			static bool Get" + table.Key + @"(std::shared_ptr<" + table.Key + @"> p, std::string  " + table.Value[0].name + @");");
             }
             sb.Append(@"
 	};
@@ -413,15 +432,16 @@ namespace DBProduce
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
             {
                 sb.Append(@"
-	bool RedisReader::Get" + table.Key + @"(std::shared_ptr<" + table.Key + @"> p, int id)
-	{
+	bool RedisReader::Get" + table.Key + @"(std::shared_ptr<" + table.Key + @"> p, std::string " + table.Value[0].name + @")
+
+    {
 		if (p == nullptr)
 		{
 			return false;
 		}
 		std::string results = """";
-		std::string cmd = ""hmget " + table.Key + @":"" + std::to_string(id)
-		        + """);//account passwd nickname
+		std::string cmd = ""hmget " + table.Key + @":"" + " + table.Value[0].name + @"
+                + """);//account passwd nickname
                 for (int i = 1; i < table.Value.Count; i++)
                 {
                     sb.Append(@" " + table.Value[i].name + @" ");
@@ -436,12 +456,14 @@ namespace DBProduce
 		DBCommon::split(results, vec, "" "");
 		if (vec.size() >= " + (table.Value.Count - 1) + @")
 		{
-            p->id = id;");
+            p->" + table.Value[0].name + @" = atof(" + table.Value[0].name + @".c_str());");
                 for (int i = 1; i < table.Value.Count; i++)
                 {
 
 
-                    if (table.Value[i].type == "float" || table.Value[i].type == "double")
+                    if (table.Value[i].type == "float" 
+                        || table.Value[i].type == "double"
+                        || table.Value[i].type == "decimal")
                     {
                         sb.Append(@"
             p->" + table.Value[i].name + @" = atof(vec[" + (i - 1) + @"].c_str());");
@@ -527,16 +549,16 @@ class DGameTask: public wdcyClient
 		void registerMsgHandle();
 	private:
 		wdcyMsgRouter m_MsgRouter;
-    public：
+    public:
 		//自定义事件");
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
             {
                 sb.Append(@"
-            //表" + table.Key + @"的增删改查操作
-            int onGet" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
-			int onCreate" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
-			int onUpdate" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
-			int onDelete" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
+        //表" + table.Key + @"的增删改查操作
+        int onGet" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
+		int onCreate" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
+		int onUpdate" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
+		int onDelete" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength);
 
 ");
             }
@@ -583,7 +605,7 @@ int DGameTask::verifyConn(const MessageHead* pMsg, const uint32_t iLength)
 	DG_LogicRegister sendMsg;
 	sendMsg.set_iret(0);
 	
-	Net::send(this, sendMsg, DBSGS_DG_REGISTER);
+	Net::send(this, sendMsg, DG_REGISTER);
 	std::cout << ""verifyConn success"" << std::endl;
 	
 	return 0;
@@ -614,10 +636,10 @@ void DGameTask::registerMsgHandle()
             {
                 sb.Append(@"
     //表" + table.Key + @"操作消息注册
-    REGIST_MSG_HANDLE(GD_Get_" + table.Key + @", onGet" + table.Key + @");
-    REGIST_MSG_HANDLE(GD_Create_" + table.Key + @", onCreate" + table.Key + @");
-    REGIST_MSG_HANDLE(GD_Update_" + table.Key + @", onUpdate" + table.Key + @");
-    REGIST_MSG_HANDLE(GD_Delete_" + table.Key + @", onDelete" + table.Key + @");
+    REGIST_MSG_HANDLE(GD_GET_" + table.Key.ToUpper() + @", onGet" + table.Key + @");
+    REGIST_MSG_HANDLE(GD_CREATE_" + table.Key.ToUpper() + @", onCreate" + table.Key + @");
+    REGIST_MSG_HANDLE(GD_UPDATE_" + table.Key.ToUpper() + @", onUpdate" + table.Key + @");
+    REGIST_MSG_HANDLE(GD_DELETE_" + table.Key.ToUpper() + @", onDelete" + table.Key + @");
 
 ");
             }
@@ -630,7 +652,42 @@ void DGameTask::registerMsgHandle()
                 sb.Append(@"
 int DGameTask::onGet" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength)
 {");
+                sb.Append(@"
+	GD_Get" + table.Key + @" stMsg;
+	stMsg.ParseFromArray(pMsg->data, pMsg->length);
+	
+	std::shared_ptr < DBProduce::" + table.Key + @" > p" + table.Key + @"(new DBProduce::" + table.Key + @"());
+	if (DBProduce::RedisReader::Get" + table.Key + @"(p" + table.Key + @", stMsg." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Key + table.Value[0].name + @"()))
+	{
+		DG_Get" + table.Key + @" sendMsg;
+		PD::" + table.Key + @"* st" + table.Key + @" = sendMsg.mutable_st" + table.Key + @"();
+		
+		sendMsg.set_iret(0);
+	    sendMsg.set_uiaccid(stMsg.uiaccid());
+		");
+                for (int i = 0; i < table.Value.Count; i++)
+                {
+                    sb.Append(@"
+		st" + table.Key + @"->set_" + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"(p" + table.Key + @" ->" + table.Value[i].name + @");
+");
+                }
+                sb.Append(@"
+        
+		Net::send(this, sendMsg, DG_GET_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""获取" + table.Key + @"成功"");
 
+	}
+	else
+	{
+		DG_Get" + table.Key + @" sendMsg;
+		PD::" + table.Key + @"* st" + table.Key + @" = sendMsg.mutable_st" + table.Key + @"();
+		sendMsg.set_iret(-1);
+		sendMsg.set_uiaccid(stMsg.uiaccid());
+		Net::send(this, sendMsg, DG_GET_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO,""获取" + table.Key + @"失败"");
+
+	}
+	return 0;");
 
                 sb.Append(@"
 }");
@@ -640,11 +697,129 @@ int DGameTask::onCreate" + table.Key + @"(const MessageHead* pMsg, const uint32_
 {");
 
                 sb.Append(@"
+	GD_Create" + table.Key + @" stMsg;
+	stMsg.ParseFromArray(pMsg->data, pMsg->length);
+	
+	std::shared_ptr < DBProduce::" + table.Key + @" > p" + table.Key + @"(new DBProduce::" + table.Key + @"());
+	if (!DBProduce::RedisReader::Get" + table.Key + @"(p" + table.Key + @", stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Value[0].name + @"()))
+	{
+		std::shared_ptr < DBProduce::DBMsg > dbMsg(new DBProduce::DBMsg());
+		dbMsg->id = stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Value[0].name + @"();
+		dbMsg->dbCMD = DBProduce::DBCMD::dbinsert;
+		dbMsg->tablename = """ + table.Key + @""";
+		std::shared_ptr < std::map<std::string, std::string>
+		        > data(new std::map<std::string, std::string>());
+        ");
+                for (int i = 1; i < table.Value.Count; i++)
+                {
+                    if (TypesChange.dbtocpp(table.Value[i].type) != "std::string")
+                    {
+                        sb.Append(@"
+	data->insert(
+		        std::pair<std::string, std::string>(""" + table.Value[i].name + @""",
+		                std::to_string(stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"())));");
+                    }
+                    else
+                    {
+                        sb.Append(@"
+	data->insert(
+		        std::pair<std::string, std::string>(""" + table.Value[i].name + @""",
+		                stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"()));");
+                    }
+                }
+                sb.Append(@"
+		dbMsg->data = data;
+		DBProduce::WriteBackMgr::getInstance().WriteBack(dbMsg);
+		
+		DG_Create" + table.Key + @" sendMsg;
+		sendMsg.set_iret(0);
+		sendMsg.set_uiaccid(stMsg.uiaccid());
+
+        PD::" + table.Key + @"* st" + table.Key + @" = sendMsg.mutable_st" + table.Key + @"();
+		
+		");
+                for (int i = 0; i < table.Value.Count; i++)
+                {
+                    sb.Append(@"
+		st" + table.Key + @"->set_" + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"(stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"());
+");
+                }
+                sb.Append(@"
+    ");
+
+                sb.Append(@"
+		Net::send(this, sendMsg, DG_CREATE_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""创建" + table.Key + @"成功"");
+	}
+	else
+	{
+		DG_Create" + table.Key + @" sendMsg;
+		sendMsg.set_iret(-1);
+		sendMsg.set_uiaccid(stMsg.uiaccid());
+		Net::send(this, sendMsg, DG_CREATE_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""创建_" + table.Key + @"失败"");
+	}
+	
+	return 0;
+                ");
+
+                sb.Append(@"
 }");
 
                 sb.Append(@"
 int DGameTask::onUpdate" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength)
 {");
+                sb.Append(@"
+GD_Update" + table.Key + @" stMsg;
+	stMsg.ParseFromArray(pMsg->data, pMsg->length);
+	std::shared_ptr < DBProduce::" + table.Key + @" > p" + table.Key + @"(new DBProduce::" + table.Key + @"());
+	if (DBProduce::RedisReader::Get" + table.Key + @"(p" + table.Key + @", stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Value[0].name + @"()))
+	{
+		std::shared_ptr < DBProduce::DBMsg > dbMsg(new DBProduce::DBMsg());
+		dbMsg->id = stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Value[0].name + @"();
+
+		dbMsg->dbCMD = DBProduce::DBCMD::dbupdate;
+		dbMsg->tablename = """ + table.Key + @""";
+		std::shared_ptr < std::map<std::string, std::string>
+		> data(new std::map<std::string, std::string>());
+");
+                for (int i = 1; i < table.Value.Count; i++)
+                {
+                    if (TypesChange.dbtocpp(table.Value[i].type) != "std::string")
+                    {
+                        sb.Append(@"
+	data->insert(
+		        std::pair<std::string, std::string>(""" + table.Value[i].name + @""",
+		                std::to_string(stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"())));");
+                    }
+                    else
+                    {
+                        sb.Append(@"
+	data->insert(
+		        std::pair<std::string, std::string>(""" + table.Value[i].name + @""",
+		                stMsg.st" + table.Key + @"()." + TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + @"()));");
+                    }
+                }
+                sb.Append(@"
+		dbMsg->data = data;
+		DBProduce::WriteBackMgr::getInstance().WriteBack(dbMsg);
+
+		DG_Update" + table.Key + @" sendMsg;
+		sendMsg.set_iret(0);
+		sendMsg.set_uiaccid(stMsg.uiaccid());
+		Net::send(this, sendMsg, DG_UPDATE_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""更新" + table.Key + @"成功"");
+	}
+	else
+	{
+		DG_Update" + table.Key + @" sendMsg;
+		sendMsg.set_iret(-1);
+		sendMsg.set_uiaccid(stMsg.uiaccid());
+		Net::send(this, sendMsg, DG_UPDATE_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""更新" + table.Key + @"失败"");
+	}
+	return 0;
+");
 
                 sb.Append(@"
 }");
@@ -652,6 +827,45 @@ int DGameTask::onUpdate" + table.Key + @"(const MessageHead* pMsg, const uint32_
                 sb.Append(@"
 int DGameTask::onDelete" + table.Key + @"(const MessageHead* pMsg, const uint32_t iLength)
 {");
+
+                sb.Append(@"
+	GD_Delete" + table.Key + @" stMsg;
+	stMsg.ParseFromArray(pMsg->data, pMsg->length);
+
+	std::shared_ptr < DBProduce::" + table.Key + @" > p" + table.Key + @"(new DBProduce::" + table.Key + @"());
+	if (DBProduce::RedisReader::Get" + table.Key + @"(p" + table.Key + @", stMsg." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Key + table.Value[0].name + @"()))
+	{
+		std::shared_ptr < DBProduce::DBMsg > dbMsg(new DBProduce::DBMsg());
+		dbMsg->id = stMsg." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Key + table.Value[0].name + @"();
+		dbMsg->dbCMD = DBProduce::DBCMD::dbdelete;
+		dbMsg->tablename = """ + table.Key + @""";
+		std::shared_ptr < std::map<std::string, std::string>
+		> data(new std::map<std::string, std::string>());
+		data->insert(
+			std::pair<std::string, std::string>(""" + table.Value[0].name + @""",
+			std::to_string(stMsg." + TypesChange.dbtoProtohead(table.Value[0].type) + table.Key + table.Value[0].name + @"())));
+		
+
+		dbMsg->data = data;
+		DBProduce::WriteBackMgr::getInstance().WriteBack(dbMsg);
+
+		DG_Delete" + table.Key + @" sendMsg;
+		sendMsg.set_iret(0);
+		sendMsg.set_uiaccid(stMsg.uiaccid());
+		Net::send(this, sendMsg, DG_DELETE_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""删除" + table.Key + @"成功"");
+	}
+	else
+	{
+		DG_Get" + table.Key + @"  sendMsg;
+		sendMsg.set_iret(-1);
+        sendMsg.set_uiaccid(stMsg.uiaccid());
+		Net::send(this, sendMsg, DG_DELETE_" + table.Key.ToUpper() + @");
+		GAME_LOG(LOG_INFO, ""删除" + table.Key + @"失败"");
+	}
+
+	return 0;
+");
 
                 sb.Append(@"
 }");
@@ -662,6 +876,7 @@ int DGameTask::onDelete" + table.Key + @"(const MessageHead* pMsg, const uint32_
 
         public static void GenDBGameProto()
         {
+            StringBuilder sbb = new StringBuilder();
             int protoId = 200;
             sb.Clear();
             sb.Append(@"
@@ -669,15 +884,19 @@ import ""DBStruct.proto"";
 
 message GD_LogicRegister
 {
-	//#define DBSGS_DG_REGISTER	200
+	//#define DG_REGISTER	200
 	optional uint32 uiServerId = 1;
 }
 
 message DG_LogicRegister
 {
-	//#define DBSGS_GD_REGISTER    201
+	//#define GD_REGISTER    201
 	optional int32 iRet = 1;
 }");
+            sbb.Append(@"
+	//#define DG_REGISTER	200
+	//#define GD_REGISTER    201
+");
             protoId++;
 
             foreach (KeyValuePair<String, List<DBField>> table in DownDatas.tables)
@@ -688,82 +907,111 @@ message DG_LogicRegister
 //通过id获取" + table.Key + @"中的对应数据
 message GD_Get" + table.Key + @"
 {
-    //#define GD_Get_" + table.Key + @" 	" + protoId + @"
+    //#define GD_GET_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
-    required uint32 ui" + table.Key + @"id = 2; 
+        optional " + TypesChange.dbtoProto(table.Value[0].type) + " " + TypesChange.dbtoProtohead(table.Value[0].type) + table.Key + @"id = 2; 
+
 }
+");
+                sbb.Append(@"
+    //#define GD_GET_" + table.Key.ToUpper() + @" 	" + protoId + @"
 ");
                 protoId++;
                 sb.Append(@"
 message DG_Get" + table.Key + @"
 {
-    //#define DG_Get_" + table.Key + @" 	" + protoId + @"
+    //#define DG_GET_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
     required int32 iRet = 2;
-    optional PD." + table.Key + " st" + table.Key + @" =2;
+    optional PD." + table.Key + " st" + table.Key + @" =3;
 }
 ");
-
+                sbb.Append(@"
+    //#define DG_GET_" + table.Key.ToUpper() + @" 	" + protoId + @"
+");
                 protoId++;
                 sb.Append(@"
 //创建" + table.Key + @"中的对应数据
 message GD_Create" + table.Key + @"
 {
-    //#define GD_Create_" + table.Key + @" 	" + protoId + @"
+    //#define GD_CREATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
     optional PD." + table.Key + " st" + table.Key + @" =2;
 }
+");
+                sbb.Append(@"
+    //#define GD_CREATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
 ");
                 protoId++;
                 sb.Append(@"
 message DG_Create" + table.Key + @"
 {
-    //#define DG_Create_" + table.Key + @" 	" + protoId + @"
+    //#define DG_CREATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
-    optional int32 iRet = 2;
+    optional int32 iRet =2;
+    optional PD." + table.Key + " st" + table.Key + @" =3;
 }
+");
+                sbb.Append(@"
+    //#define DG_CREATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
 ");
                 protoId++;
                 sb.Append(@"
 //更新" + table.Key + @"中的对应数据
 message GD_Update" + table.Key + @"
 {
-    //#define GD_Update_" + table.Key + @" 	" + protoId + @"
+    //#define GD_UPDATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
     optional PD." + table.Key + " st" + table.Key + @" =2;
 }
+");
+                sbb.Append(@"
+    //#define GD_UPDATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
 ");
                 protoId++;
                 sb.Append(@"
 message DG_Update" + table.Key + @"
 {
-    //#define DG_Update_" + table.Key + @" 	" + protoId + @"
+    //#define DG_UPDATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
     optional int32 iRet = 2;
 }
 ");
-
+                sbb.Append(@"
+    //#define DG_UPDATE_" + table.Key.ToUpper() + @" 	" + protoId + @"
+");
                 protoId++;
                 sb.Append(@"
 //通过id删除" + table.Key + @"中的对应数据
 message GD_Delete" + table.Key + @"
 {
-    //#define GD_Delete_" + table.Key + @" 	" + protoId + @"
+    //#define GD_DELETE_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
-    required uint32 ui" + table.Key + @"id = 2; 
+       optional " + TypesChange.dbtoProto(table.Value[0].type) + " " + TypesChange.dbtoProtohead(table.Value[0].type) + table.Key + @"id = 2; 
+
 }
+");
+                sbb.Append(@"
+    //#define GD_DELETE_" + table.Key.ToUpper() + @" 	" + protoId + @"
 ");
                 protoId++;
                 sb.Append(@"
 message DG_Delete" + table.Key + @"
 {
-    //#define DG_Delete_" + table.Key + @" 	" + protoId + @"
+    //#define DG_DELETE_" + table.Key.ToUpper() + @" 	" + protoId + @"
     required uint32 uiaccid = 1; 
     optional int32 iRet = 2;
 }
 ");
+                sbb.Append(@"
+    //#define DG_DELETE_" + table.Key.ToUpper() + @" 	" + protoId + @"
+");
 
             }
+            sb.Append(@"
+//替换消息头的宏定义
+" + sbb.ToString() + @"
+");
             OutPut.Out(folder + "DGProtocol.proto", sb.ToString());
             //------------------------------------------------------------------------------------------------
 
@@ -783,7 +1031,7 @@ message " + table.Key + @"
                 for (int i = 0; i < table.Value.Count; i++)
                 {
                     sb.Append(@"
-    required " + Common.TypesChange.dbtoProto(table.Value[i].type) + " " + Common.TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + " = " + (i + 1) + ";");
+    optional " + Common.TypesChange.dbtoProto(table.Value[i].type) + " " + Common.TypesChange.dbtoProtohead(table.Value[i].type) + table.Value[i].name + " = " + (i + 1) + ";");
                 }
 
                 sb.Append(@"

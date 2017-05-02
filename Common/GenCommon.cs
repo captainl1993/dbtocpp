@@ -11,17 +11,18 @@ namespace dbtocpp.Common
         public  static String Defualtauthor = "毛自豪";
         public static StringBuilder GenHeader(StringBuilder sb, string filename, string vesion, string description)
         {
-            sb.Append(@"/************************************************************
- * FileName: " + filename + @"
- * Author: " + Defualtauthor + @"
- * Version : " + vesion + @"
- * Date: " + DateTime.Now.ToString("yyyy年MM月dd日 HH:mm:ss") + @"
- * Description: 生成物：" + description + @"
- *
- ***********************************************************/
-");
+//            sb.Append(@"/************************************************************
+// * FileName: " + filename + @"
+// * Author: " + Defualtauthor + @"
+// * Version : " + vesion + @"
+// * Date: " + DateTime.Now.ToString("yyyy年MM月dd日 HH:mm:ss") + @"
+// * Description: 生成物：" + description + @"
+// *
+// ***********************************************************/
+//");
             return sb;
 
         }
+
     }
 }

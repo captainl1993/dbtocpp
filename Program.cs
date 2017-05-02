@@ -28,6 +28,12 @@ namespace dbtocpp
             //生成协议相关
             Gencpp.GenDBGameProto();
             Gencpp.GenDBStructProto();
+
+            //生成特定的消息处理类
+           // Gencpp.GenDBGameTask();
+
+            //生成CS对应得结构
+            //GenCS.GenStructs();
             //生成json相关的C++序列化反序列化文件
             //GenJsonMG.Gen();
         }

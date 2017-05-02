@@ -31,7 +31,11 @@ namespace dbtocpp.Common
                 case "datetime":
                 case "time":
                 case "date":
+                case "blob":
                     newType = "std::string";
+                    break;
+                case "decimal":
+                    newType = "double";
                     break;
                 default:
                     newType = oldType;
@@ -39,7 +43,42 @@ namespace dbtocpp.Common
             }
             return newType;
         }
+        public static String dbtocs(String oldType)
+        {
+            String newType = "";
+            switch (oldType)
+            {
+                case "bigint":
+                    newType = "Int64";
+                    break;
+                case "timestamp":
+                case "year":
+                case "tinyint":
+                case "smallint":
+                case "mediumint":
+                    newType = "char";
+                    break;
+                case "varchar":
+                case "tinytext":
+                case "mediumtext":
+                case "longtext":
+                case "text":
+                case "datetime":
+                case "time":
+                case "date":
+                case "blob":
+                    newType = "string";
+                    break;
+                case "bit":
+                    newType="bool";
+                    break;
 
+                default:
+                    newType = oldType;
+                    break;
+            }
+            return newType;
+        }
         public static String dbtoProto(String oldType)
         {
             String newType = "";
@@ -66,7 +105,11 @@ namespace dbtocpp.Common
                 case "datetime":
                 case "time":
                 case "date":
+
                     newType = "string";
+                    break;
+                case "blob":
+                    newType = "bytes";
                     break;
                 default:
                     newType = oldType;
@@ -104,6 +147,8 @@ namespace dbtocpp.Common
                 case "datetime":
                 case "time":
                 case "date":
+                case "blob":
+
                     newType = "s";
                     break;
                 default:
